@@ -1,16 +1,15 @@
-# flutter_application_4
+## Projeto
+- Nome: The Reserve
+- Firebase: the-reserve-mobile
+- Descrição: Aplicativo para reservas de restaurantes
 
-A new Flutter project.
+## Integrantes
 
-## Getting Started
+- Ghabriel de Oliveira Penha
+- João Victor Espindola Macedo
+- Rafael Silva Alves
 
-This project is a starting point for a Flutter application.
+## Firebase
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Código do projeto: app-mobile-a1694
+- Número do projeto: 431338630889
