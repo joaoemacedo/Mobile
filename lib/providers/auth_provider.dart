@@ -1,175 +1,251 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_application_4/models/restaurant.dart';
-import 'package:flutter_application_4/services/restaurant_service.dart';
+import 'package:flutter_application_4/models/reservation.dart';
 
 class AuthProvider with ChangeNotifier {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   bool _isAuthenticated = false;
   String _loggedInUserEmail = '';
   Restaurant? _restaurant;
-  final RestaurantService _restaurantService = RestaurantService();
-
-  // Simulação de banco de dados de usuários cadastrados
-  final Map<String, Map<String, dynamic>> _registeredUsers = {
-    'teste@teste.com': {
-      'password': 'senha123',
-      'restaurantName': 'Restaurante Teste',
-      'city': 'São Paulo',
-      'state': 'SP',
-      'operatingDays': [],
-      'openingTime': null,
-      'closingTime': null,
-      'tables': 0,
-      'maxPeoplePerReservation': 0,
-    },
-    'usuario@teste.com': {
-      'password': '123456',
-      'restaurantName': 'Outro Restaurante',
-      'city': 'Rio de Janeiro',
-      'state': 'RJ',
-      'operatingDays': [],
-      'openingTime': null,
-      'closingTime': null,
-      'tables': 0,
-      'maxPeoplePerReservation': 0,
-    },
-  };
 
   bool get isAuthenticated => _isAuthenticated;
-
   String get loggedInUserEmail => _loggedInUserEmail;
-
   Restaurant? get restaurant => _restaurant;
 
-  List<Map<String, dynamic>> get userRestaurants {
-    return _registeredUsers.values.toList();
-  }
+  Future<void> register(String email, String password, String restaurantName, String city, String state) async {
+    try {
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
 
-  void register(String email, String password, String restaurantName, String city, String state) {
-    if (_registeredUsers.containsKey(email)) {
-      throw Exception('Este email já está registrado. Por favor, use outro email.');
-    }
+      await _firestore.collection('users').doc(email).set({
+        'restaurantName': restaurantName,
+        'city': city,
+        'state': state,
+        'operatingDays': [],
+        'openingTime': null,
+        'closingTime': null,
+        'tables': 0,
+        'maxPeoplePerReservation': 0,
+        'imageUrl': '',
+      });
 
-    _registeredUsers[email] = {
-      'password': password,
-      'restaurantName': restaurantName,
-      'city': city,
-      'state': state,
-      'operatingDays': [],
-      'openingTime': null,
-      'closingTime': null,
-      'tables': 0,
-      'maxPeoplePerReservation': 0,
-    };
-
-    _isAuthenticated = true;
-    _loggedInUserEmail = email;
-    _restaurant = Restaurant(
-      name: restaurantName,
-      city: city,
-      state: state,
-      openingDays: [],
-      openingTime: null,
-      closingTime: null,
-      tables: 0,
-      maxPeoplePerReservation: 0,
-      imageUrl: '',
-      operatingDays: [],
-    );
-
-    // Salvar no serviço de restaurante
-    _restaurantService.updateRestaurant(email, _restaurant!);
-
-    notifyListeners();
-  }
-
-  void login(String email, String password) {
-    if (_registeredUsers.containsKey(email) && _registeredUsers[email]!['password'] == password) {
       _isAuthenticated = true;
       _loggedInUserEmail = email;
-      _restaurant = _restaurantService.getRestaurant(email);
-
-      if (_restaurant == null) {
-        // Caso não exista restaurante no serviço, criar um novo
-        _restaurant = Restaurant(
-          name: _registeredUsers[email]!['restaurantName'],
-          city: _registeredUsers[email]!['city'],
-          state: _registeredUsers[email]!['state'],
-          openingDays: List<String>.from(_registeredUsers[email]!['operatingDays']),
-          openingTime: _registeredUsers[email]!['openingTime'],
-          closingTime: _registeredUsers[email]!['closingTime'],
-          tables: _registeredUsers[email]!['tables'],
-          maxPeoplePerReservation: _registeredUsers[email]!['maxPeoplePerReservation'],
-          imageUrl: '',
-          operatingDays: [],
-        );
-        _restaurantService.updateRestaurant(email, _restaurant!);
-      }
 
       notifyListeners();
-    } else {
-      throw Exception('Credenciais inválidas. Por favor, verifique seu email e senha.');
+    } catch (e) {
+      throw Exception('Failed to register: $e');
     }
   }
 
-  void logout() {
+  Future<void> login(String email, String password) async {
+    try {
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(email).get();
+      if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+
+        _isAuthenticated = true;
+        _loggedInUserEmail = email;
+        _restaurant = Restaurant(
+          name: userData['restaurantName'],
+          city: userData['city'],
+          state: userData['state'],
+          operatingDays: List<String>.from(userData['operatingDays']),
+          openingTime: _convertTimestampToTimeOfDay(userData['openingTime']),
+          closingTime: _convertTimestampToTimeOfDay(userData['closingTime']),
+          tables: userData['tables'],
+          maxPeoplePerReservation: userData['maxPeoplePerReservation'],
+          imageUrl: userData['imageUrl'] ?? '',
+        );
+
+        notifyListeners();
+      } else {
+        throw Exception('No restaurant found for this user');
+      }
+    } catch (e) {
+      throw Exception('Failed to login: $e');
+    }
+  }
+
+  Future<void> logout() async {
+    await _auth.signOut();
     _isAuthenticated = false;
     _loggedInUserEmail = '';
     _restaurant = null;
     notifyListeners();
   }
 
-  void updateRestaurantInfo(
-    String newRestaurantName,
-    String newState,
-    String newCity,
-    TimeOfDay? newOpeningTime,
-    TimeOfDay? newClosingTime,
-    int newTables,
-    int newMaxPeoplePerReservation,
-    List<String> newOperatingDays,
-  ) {
-    if (_restaurant != null) {
-      _restaurant = _restaurant!.copyWith(
-        name: newRestaurantName,
-        state: newState,
-        city: newCity,
-        openingDays: newOperatingDays,
-        openingTime: newOpeningTime,
-        closingTime: newClosingTime,
-        tables: newTables,
-        maxPeoplePerReservation: newMaxPeoplePerReservation,
-      );
+  Future<List<Restaurant>> getAllRestaurants() async {
+    try {
+      QuerySnapshot restaurantSnapshot = await _firestore.collection('users').get();
 
-      // Atualiza também os dados do usuário registrado
-      final updatedUserData = {
-        'password': _registeredUsers[_loggedInUserEmail]!['password'],
-        'restaurantName': newRestaurantName,
-        'city': newCity,
-        'state': newState,
-        'operatingDays': newOperatingDays,
-        'openingTime': newOpeningTime,
-        'closingTime': newClosingTime,
-        'tables': newTables,
-        'maxPeoplePerReservation': newMaxPeoplePerReservation,
-      };
-      _registeredUsers[_loggedInUserEmail] = updatedUserData;
+      List<Restaurant> allRestaurants = [];
+      for (var doc in restaurantSnapshot.docs) {
+        Map<String, dynamic> userData = doc.data() as Map<String, dynamic>;
 
-      // Salvar no serviço de restaurante
-      _restaurantService.updateRestaurant(_loggedInUserEmail, _restaurant!);
+        Restaurant restaurant = Restaurant(
+          name: userData['restaurantName'],
+          city: userData['city'],
+          state: userData['state'],
+          operatingDays: List<String>.from(userData['operatingDays']),
+          openingTime: _convertTimestampToTimeOfDay(userData['openingTime']),
+          closingTime: _convertTimestampToTimeOfDay(userData['closingTime']),
+          tables: userData['tables'],
+          maxPeoplePerReservation: userData['maxPeoplePerReservation'],
+          imageUrl: userData['imageUrl'] ?? '',
+        );
 
-      notifyListeners();
+        allRestaurants.add(restaurant);
+      }
+
+      return allRestaurants;
+    } catch (e) {
+      throw Exception('Failed to fetch all restaurants: $e');
     }
   }
 
-  Map<String, dynamic> getRegisteredUserData(String email) {
-    return _registeredUsers[email] ?? {};
+  Future<List<Reservation>> getReservations() async {
+    try {
+      String email = _loggedInUserEmail;
+      if (email.isEmpty || _restaurant == null) {
+        throw Exception('User not authenticated or restaurant not found');
+      }
+
+      QuerySnapshot reservationSnapshot = await _firestore.collection('reservations').where('restaurantEmail', isEqualTo: email).get();
+
+      List<Reservation> reservations = [];
+      for (var doc in reservationSnapshot.docs) {
+        Map<String, dynamic> reservationData = doc.data() as Map<String, dynamic>;
+
+        Reservation reservation = Reservation(
+          restaurantName: reservationData['restaurantName'],
+          userEmail: reservationData['userEmail'],
+          date: reservationData['date'].toDate(),
+          time: _convertTimestampToTimeOfDay(reservationData['time']),
+          numberOfPeople: reservationData['numberOfPeople'],
+          observations: reservationData['observations'] ?? '',
+          status: reservationData['status'], // Adicionei o status aqui
+        );
+
+        reservations.add(reservation);
+      }
+
+      return reservations;
+    } catch (e) {
+      throw Exception('Failed to fetch reservations: $e');
+    }
   }
 
-  bool isRestaurantDefined() {
-    return _restaurant != null;
+  Future<void> addReservation(Reservation reservation) async {
+    try {
+      String email = _loggedInUserEmail;
+      if (email.isEmpty || _restaurant == null) {
+        throw Exception('User not authenticated or restaurant not found');
+      }
+
+      await _firestore.collection('reservations').add({
+        'restaurantEmail': email,
+        'restaurantName': _restaurant!.name,
+        'userEmail': reservation.userEmail,
+        'date': reservation.date,
+        'time': _convertTimeOfDayToTimestamp(reservation.time),
+        'numberOfPeople': reservation.numberOfPeople,
+        'observations': reservation.observations,
+        'status': reservation.status, // Incluído o status aqui
+      });
+
+      notifyListeners();
+    } catch (e) {
+      throw Exception('Failed to add reservation: $e');
+    }
   }
 
-  bool isAuthenticatedUser() {
-    return _isAuthenticated;
+  Future<void> updateReservationStatus(Reservation reservation, String newStatus) async {
+    try {
+      String email = _loggedInUserEmail;
+      if (email.isEmpty || _restaurant == null) {
+        throw Exception('User not authenticated or restaurant not found');
+      }
+
+      await _firestore.collection('reservations').doc(reservation.userEmail).update({
+        'status': newStatus,
+      });
+
+      reservation.status = newStatus; // Atualiza localmente
+      notifyListeners();
+    } catch (e) {
+      throw Exception('Failed to update reservation status: $e');
+    }
+  }
+
+  Future<void> updateRestaurantInfo(
+    String restaurantName,
+    String state,
+    String city,
+    TimeOfDay? openingTime,
+    TimeOfDay? closingTime,
+    int tables,
+    int maxPeoplePerReservation,
+    List<String> operatingDays,
+    String imageUrl,
+  ) async {
+    try {
+      String email = _loggedInUserEmail;
+      if (email.isEmpty || _restaurant == null) {
+        throw Exception('User not authenticated or restaurant not found');
+      }
+
+      await _firestore.collection('users').doc(email).update({
+        'restaurantName': restaurantName,
+        'state': state,
+        'city': city,
+        'operatingDays': operatingDays,
+        'openingTime': _convertTimeOfDayToTimestamp(openingTime),
+        'closingTime': _convertTimeOfDayToTimestamp(closingTime),
+        'tables': tables,
+        'maxPeoplePerReservation': maxPeoplePerReservation,
+        'imageUrl': imageUrl,
+      });
+
+      _restaurant = Restaurant(
+        name: restaurantName,
+        state: state,
+        city: city,
+        operatingDays: operatingDays,
+        openingTime: openingTime,
+        closingTime: closingTime,
+        tables: tables,
+        maxPeoplePerReservation: maxPeoplePerReservation,
+        imageUrl: imageUrl,
+      );
+
+      notifyListeners();
+    } catch (e) {
+      throw Exception('Failed to update restaurant info: $e');
+    }
+  }
+
+  TimeOfDay _convertTimestampToTimeOfDay(Timestamp? timestamp) {
+    if (timestamp == null) {
+      return const TimeOfDay(hour: 0, minute: 0);
+    }
+
+    DateTime dateTime = timestamp.toDate();
+    return TimeOfDay(hour: dateTime.hour, minute: dateTime.minute);
+  }
+
+  Timestamp _convertTimeOfDayToTimestamp(TimeOfDay? timeOfDay) {
+    if (timeOfDay == null) {
+      return Timestamp.now();
+    }
+
+    DateTime now = DateTime.now();
+    DateTime dateTime = DateTime(now.year, now.month, now.day, timeOfDay.hour, timeOfDay.minute);
+    return Timestamp.fromDate(dateTime);
   }
 }

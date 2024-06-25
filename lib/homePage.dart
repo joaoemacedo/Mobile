@@ -3,7 +3,7 @@ import 'package:flutter_application_4/all_restaurants_page.dart';
 import 'package:flutter_application_4/login_page.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {

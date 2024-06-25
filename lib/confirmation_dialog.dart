@@ -11,7 +11,7 @@ class ConfirmationDialog extends StatelessWidget {
   final String observations;
 
   const ConfirmationDialog({
-    Key? key,
+    super.key,
     required this.restaurant,
     required this.name,
     required this.email,
@@ -19,7 +19,7 @@ class ConfirmationDialog extends StatelessWidget {
     required this.date,
     required this.time,
     required this.observations,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -43,8 +43,7 @@ class ConfirmationDialog extends StatelessWidget {
       actions: <Widget>[
         TextButton(
           onPressed: () {
-            Navigator.of(context).pop(); // Fechar o diálogo de confirmação
-            _showReservationSuccessDialog(context); // Chamar método para exibir diálogo de sucesso
+            _confirmReservation(context); // Confirmar a reserva
           },
           child: const Text('Confirmar'),
         ),
@@ -58,7 +57,9 @@ class ConfirmationDialog extends StatelessWidget {
     );
   }
 
-  void _showReservationSuccessDialog(BuildContext context) {
+  void _confirmReservation(BuildContext context) {
+    // Aqui você pode adicionar lógica para confirmar a reserva (enviar para API, salvar no banco de dados, etc.)
+    // Exemplo simples: exibir diálogo de sucesso e fechar o diálogo de reserva
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -67,8 +68,7 @@ class ConfirmationDialog extends StatelessWidget {
         actions: <Widget>[
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop(); // Fechar o diálogo de sucesso
-              Navigator.of(context).pop(); // Fechar o diálogo de reserva
+              Navigator.of(context).popUntil((route) => route.isFirst); // Fechar todos os diálogos e voltar para a primeira tela
             },
             child: const Text('OK'),
           ),

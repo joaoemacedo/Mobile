@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_4/providers/auth_provider.dart';
+import 'package:flutter_application_4/utils/validation_utils.dart'; // Importe a função de validação
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({Key? key}) : super(key: key);
@@ -16,20 +17,27 @@ class _RegisterPageState extends State<RegisterPage> {
   String restaurantName = '';
   String city = '';
   String state = '';
+  bool _isLoading = false;
 
-  void _register(BuildContext context) {
+  void _register(BuildContext context) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    setState(() {
+      _isLoading = true;
+    });
     try {
-      authProvider.register(email, password, restaurantName, city, state);
+      await authProvider.register(email, password, restaurantName, city, state);
       Navigator.pushReplacementNamed(context, '/restaurantHome');
     } catch (e) {
-      // Tratar erro de email já registrado
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString()),
           duration: const Duration(seconds: 3),
         ),
       );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -55,7 +63,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   if (value == null || value.isEmpty) {
                     return 'Por favor, insira seu email';
                   }
-                  return null;
+                  return validateEmail(value); // Utilize a função de validação de e-mail aqui
                 },
                 onChanged: (value) {
                   setState(() {
@@ -125,18 +133,24 @@ class _RegisterPageState extends State<RegisterPage> {
                 },
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: const Color(0xFF7D0A0A),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  minimumSize: const Size(double.infinity, 50),
-                ),
-                onPressed: () => _register(context),
-                child: const Text('Cadastrar'),
-              ),
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: const Color(0xFF7D0A0A),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: const Size(double.infinity, 50),
+                      ),
+                      onPressed: () {
+                        if (_formKey.currentState!.validate()) {
+                          _register(context);
+                        }
+                      },
+                      child: const Text('Cadastrar'),
+                    ),
             ],
           ),
         ),

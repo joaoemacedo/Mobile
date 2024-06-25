@@ -16,6 +16,7 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
   late TextEditingController _restaurantNameController;
   late TextEditingController _stateController;
   late TextEditingController _cityController;
+  late TextEditingController _imageUrlController;
 
   bool sunday = false;
   bool monday = false;
@@ -36,6 +37,8 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
     _restaurantNameController = TextEditingController();
     _stateController = TextEditingController();
     _cityController = TextEditingController();
+    _imageUrlController = TextEditingController();
+
     // Carregar as informações do restaurante ao iniciar a tela
     loadRestaurantInfo();
   }
@@ -45,6 +48,7 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
     _restaurantNameController.dispose();
     _stateController.dispose();
     _cityController.dispose();
+    _imageUrlController.dispose();
     super.dispose();
   }
 
@@ -52,9 +56,10 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (authProvider.restaurant != null) {
       setState(() {
-        _restaurantNameController.text = authProvider.restaurant!.name ?? '';
-        _stateController.text = authProvider.restaurant!.state ?? '';
-        _cityController.text = authProvider.restaurant!.city ?? '';
+        _restaurantNameController.text = authProvider.restaurant!.name;
+        _stateController.text = authProvider.restaurant!.state;
+        _cityController.text = authProvider.restaurant!.city;
+        _imageUrlController.text = authProvider.restaurant!.imageUrl ?? '';
 
         sunday = authProvider.restaurant!.operatingDays.contains('sunday');
         monday = authProvider.restaurant!.operatingDays.contains('monday');
@@ -70,6 +75,19 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
         maxPeoplePerReservation = authProvider.restaurant!.maxPeoplePerReservation ?? 0;
       });
     }
+  }
+
+  String? validateField(String? value, String fieldName) {
+    if (value == null || value.isEmpty) {
+      return 'Informe o $fieldName';
+    }
+    return null;
+  }
+
+  void showValidationMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -97,9 +115,7 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
                   border: OutlineInputBorder(),
                 ),
                 style: const TextStyle(color: Colors.black, fontSize: 16),
-                onChanged: (value) {
-                  // Não é necessário setState para onChanged no TextFormField
-                },
+                validator: (value) => validateField(value, 'nome do restaurante'),
               ),
               const SizedBox(height: 10),
               TextFormField(
@@ -109,9 +125,7 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
                   border: OutlineInputBorder(),
                 ),
                 style: const TextStyle(color: Colors.black, fontSize: 16),
-                onChanged: (value) {
-                  // Não é necessário setState para onChanged no TextFormField
-                },
+                validator: (value) => validateField(value, 'estado'),
               ),
               const SizedBox(height: 10),
               TextFormField(
@@ -121,9 +135,17 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
                   border: OutlineInputBorder(),
                 ),
                 style: const TextStyle(color: Colors.black, fontSize: 16),
-                onChanged: (value) {
-                  // Não é necessário setState para onChanged no TextFormField
-                },
+                validator: (value) => validateField(value, 'cidade'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _imageUrlController,
+                decoration: const InputDecoration(
+                  labelText: 'URL da Imagem',
+                  border: OutlineInputBorder(),
+                ),
+                style: const TextStyle(color: Colors.black, fontSize: 16),
+                validator: (value) => validateField(value, 'URL da Imagem'),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -237,6 +259,7 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
                 inputFormatters: <TextInputFormatter>[
                   FilteringTextInputFormatter.digitsOnly,
                 ],
+                validator: (value) => validateField(value, 'quantidade de mesas'),
                 onChanged: (value) {
                   setState(() {
                     tables = int.tryParse(value) ?? 0;
@@ -255,6 +278,7 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
                 inputFormatters: <TextInputFormatter>[
                   FilteringTextInputFormatter.digitsOnly,
                 ],
+                validator: (value) => validateField(value, 'quantidade máxima de pessoas por reserva'),
                 onChanged: (value) {
                   setState(() {
                     maxPeoplePerReservation = int.tryParse(value) ?? 0;
@@ -274,7 +298,7 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
                     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                    authProvider.updateRestaurantInfo(
+                    await authProvider.updateRestaurantInfo(
                       _restaurantNameController.text,
                       _stateController.text,
                       _cityController.text,
@@ -291,13 +315,14 @@ class _RestaurantSettingsPageState extends State<RestaurantSettingsPage> {
                         if (friday) 'friday',
                         if (saturday) 'saturday',
                       ],
+                      _imageUrlController.text,
                     );
-
-                    // Após salvar, fechar a página
-                    Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Configurações salvas com sucesso!')),
                     );
+                    Navigator.pop(context); // Fecha a tela após salvar
+                  } else {
+                    showValidationMessage('Por favor, preencha todos os campos corretamente.');
                   }
                 },
                 child: const Text('Salvar Configurações'),

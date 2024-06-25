@@ -8,7 +8,17 @@ class RestaurantService {
     return _restaurants[email];
   }
 
-  void updateRestaurant(String email, Restaurant restaurant) {
+  List<Restaurant> getAllRestaurants() {
+    return _restaurants.values.toList();
+  }
+
+  void addRestaurant(String email, Restaurant restaurant) {
     _restaurants[email] = restaurant;
+  }
+
+  void updateRestaurant(String email, Restaurant restaurant) {
+    if (_restaurants.containsKey(email)) {
+      _restaurants[email] = restaurant;
+    }
   }
 }

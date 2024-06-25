@@ -5,43 +5,47 @@ import 'package:flutter_application_4/screens/reservation_dialog.dart';
 import 'package:provider/provider.dart';
 
 class AllRestaurantsPage extends StatelessWidget {
-  const AllRestaurantsPage({super.key});
+  const AllRestaurantsPage({Key? key});
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-
-    List<Restaurant> userRestaurants = authProvider.isAuthenticated
-        ? authProvider.userRestaurants.map((userData) => Restaurant(
-            name: userData['restaurantName'] ?? 'Não especificado',
-            operatingDays: List<String>.from(userData['operatingDays'] ?? []),
-            openingTime: userData['openingTime'] != null ? TimeOfDay.fromDateTime(DateTime.parse(userData['openingTime'])) : null,
-            closingTime: userData['closingTime'] != null ? TimeOfDay.fromDateTime(DateTime.parse(userData['closingTime'])) : null,
-            tables: userData['tables'] ?? 0,
-            maxPeoplePerReservation: userData['maxPeoplePerReservation'] ?? 0,
-            city: userData['city'] ?? '',
-            state: userData['state'] ?? '',
-            imageUrl: userData['imageUrl'] ?? '', openingDays: [], // URL da imagem do restaurante
-          )).toList()
-        : [];
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Todos os Restaurantes'),
       ),
-      body: userRestaurants.isEmpty
-          ? const Center(
-              child: Text(
-                'Nenhum restaurante cadastrado',
-                style: TextStyle(fontSize: 18),
-              ),
-            )
-          : ListView.builder(
-              itemCount: userRestaurants.length,
-              itemBuilder: (context, index) {
-                return _buildRestaurantCard(context, userRestaurants[index]);
-              },
-            ),
+      body: Consumer<AuthProvider>(
+        builder: (context, authProvider, child) {
+          // Utilize FutureBuilder para lidar com o Future<List<Restaurant>>
+          return FutureBuilder<List<Restaurant>>(
+            future: authProvider.getAllRestaurants(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return Center(child: Text('Erro ao carregar restaurantes: ${snapshot.error}'));
+              } else {
+                List<Restaurant> allRestaurants = snapshot.data ?? [];
+
+                if (allRestaurants.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'Nenhum restaurante cadastrado',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: allRestaurants.length,
+                  itemBuilder: (context, index) {
+                    return _buildRestaurantCard(context, allRestaurants[index]);
+                  },
+                );
+              }
+            },
+          );
+        },
+      ),
     );
   }
 
